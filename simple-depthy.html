@@ -263,21 +263,21 @@
                 <input type="file" id="imageInput" accept="image/jpeg,image/png">
                 <p style="margin-bottom: 5px;">📷 Main Image</p>
                 <p style="font-size: 12px; color: #666;">Drag & Drop or Click</p>
-                <img class="upload-preview" id="imagePreview">
+                <img class="upload-preview" id="imagePreview" alt="Main image preview">
             </div>
 
             <div class="upload-area" id="depthUpload">
                 <input type="file" id="depthInput" accept="image/jpeg,image/png">
                 <p style="margin-bottom: 5px;">🗺️ Depth Map</p>
                 <p style="font-size: 12px; color: #666;">Grayscale image</p>
-                <img class="upload-preview" id="depthPreview">
+                <img class="upload-preview" id="depthPreview" alt="Depth map preview">
             </div>
 
             <div class="error-message" id="errorMessage"></div>
         </div>
 
         <div class="preview-window">
-            <canvas id="previewCanvas"></canvas>
+            <canvas id="previewCanvas">Your browser does not support canvas.</canvas>
         </div>
 
         <div class="controls">
