@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Simple Depthy - 3D Parallax Video Generator</title>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -371,7 +372,10 @@
         const imagePreview = document.getElementById('imagePreview');
         const depthPreview = document.getElementById('depthPreview');
         const previewCanvas = document.getElementById('previewCanvas');
-        const ctx = previewCanvas.getContext('2d');
+        let renderer = null;
+        let scene = null;
+        let camera = null;
+        let mesh = null;
         const errorMessage = document.getElementById('errorMessage');
         const exportButton = document.getElementById('exportButton');
         const progressBar = document.getElementById('progressBar');
@@ -478,6 +482,7 @@
             }
             
             exportButton.disabled = false;
+            initThree();
             startAnimation();
         }
 
@@ -495,7 +500,7 @@
             const startTime = Date.now();
             
             function animate() {
-                if (!mainImage || !depthData || isExporting) {
+                if (!mainImage || !scene || isExporting) {
                     animationFrame = requestAnimationFrame(animate);
                     return;
                 }
@@ -509,112 +514,62 @@
         }
 
 
-        // Render a single frame using per-pixel displacement
-        function renderFrame(time) {
-            renderFrameToCanvas(time, previewCanvas, ctx);
-        }
-        
-        function renderFrameToCanvas(time, canvas, context) {
+        // Initialize Three.js scene once images are ready
+        function initThree() {
             const width = mainImage.width;
             const height = mainImage.height;
 
-            canvas.width = width;
-            canvas.height = height;
+            if (!renderer) {
+                renderer = new THREE.WebGLRenderer({ canvas: previewCanvas, antialias: true });
+            }
+            renderer.setSize(width, height);
 
-            const strength = parseFloat(strengthSlider.value) / 100;
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+            camera.position.z = Math.max(width, height);
+
+            const loader = new THREE.TextureLoader();
+            const colorTexture = loader.load(mainImage.src);
+            const depthTexture = loader.load(depthMap.src);
+            depthTexture.minFilter = THREE.LinearFilter;
+            depthTexture.magFilter = THREE.LinearFilter;
+            depthTexture.wrapS = THREE.ClampToEdgeWrapping;
+            depthTexture.wrapT = THREE.ClampToEdgeWrapping;
+
+            const segments = 200;
+            const geometry = new THREE.PlaneGeometry(width, height, segments, segments);
+            const material = new THREE.MeshStandardMaterial({
+                map: colorTexture,
+                displacementMap: depthTexture,
+                displacementScale: parseFloat(strengthSlider.value)
+            });
+
+            mesh = new THREE.Mesh(geometry, material);
+            scene.add(mesh);
+
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(0, 0, 1);
+            scene.add(light);
+        }
+
+        // Render a single frame
+        function renderFrame(time) {
+            if (!scene) return;
+
+            const strength = parseFloat(strengthSlider.value);
             const speed = parseFloat(speedSlider.value) / 100;
             const radius = parseFloat(radiusSlider.value);
 
-            const cameraX = Math.sin(time * speed) * radius;
-            const cameraY = Math.cos(time * speed) * radius * 0.5;
+            mesh.material.displacementScale = strength;
 
-            // Draw source image to temporary canvas
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = width;
-            tempCanvas.height = height;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.drawImage(mainImage, 0, 0);
+            const camX = Math.sin(time * speed) * radius;
+            const camY = Math.cos(time * speed) * radius * 0.5;
 
-            const srcData = tempCtx.getImageData(0, 0, width, height);
-            const dstData = tempCtx.createImageData(width, height);
+            camera.position.x = camX;
+            camera.position.y = camY;
+            camera.lookAt(0, 0, 0);
 
-            const offsetXFactor = cameraX * strength * 0.02 * width;
-            const offsetYFactor = cameraY * strength * 0.02 * height;
-
-            const src = srcData.data;
-            const dst = dstData.data;
-
-            // Per-pixel displacement by depth
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const depth = depthData[y * width + x];
-                    const depthOffset = (depth - 0.5) * 2;
-                    const dx = Math.round(x - depthOffset * offsetXFactor);
-                    const dy = Math.round(y - depthOffset * offsetYFactor);
-
-                    if (dx < 0 || dx >= width || dy < 0 || dy >= height) {
-                        continue;
-                    }
-
-                    const srcIdx = (y * width + x) * 4;
-                    const dstIdx = (dy * width + dx) * 4;
-
-                    dst[dstIdx] = src[srcIdx];
-                    dst[dstIdx + 1] = src[srcIdx + 1];
-                    dst[dstIdx + 2] = src[srcIdx + 2];
-                    dst[dstIdx + 3] = 255;
-                }
-            }
-
-            // Simple inpainting to fill gaps
-            inpaint(dstData, width, height);
-
-            context.putImageData(dstData, 0, 0);
-        }
-
-        // Naive hole filling via iterative dilation
-        function inpaint(imageData, width, height) {
-            let data = imageData.data;
-            let temp = new Uint8ClampedArray(data);
-            const iterations = 2;
-
-            for (let it = 0; it < iterations; it++) {
-                let changed = false;
-                for (let y = 0; y < height; y++) {
-                    for (let x = 0; x < width; x++) {
-                        const idx = (y * width + x) * 4;
-                        if (data[idx + 3] === 0) {
-                            let r = 0, g = 0, b = 0, count = 0;
-                            for (let oy = -1; oy <= 1; oy++) {
-                                for (let ox = -1; ox <= 1; ox++) {
-                                    if (ox === 0 && oy === 0) continue;
-                                    const nx = x + ox;
-                                    const ny = y + oy;
-                                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                                        const nIdx = (ny * width + nx) * 4;
-                                        if (temp[nIdx + 3] > 0) {
-                                            r += temp[nIdx];
-                                            g += temp[nIdx + 1];
-                                            b += temp[nIdx + 2];
-                                            count++;
-                                        }
-                                    }
-                                }
-                            }
-                            if (count > 0) {
-                                data[idx] = r / count;
-                                data[idx + 1] = g / count;
-                                data[idx + 2] = b / count;
-                                data[idx + 3] = 255;
-                                changed = true;
-                            }
-                        }
-                    }
-                }
-
-                if (!changed) break;
-                temp = new Uint8ClampedArray(data);
-            }
+            renderer.render(scene, camera);
         }
 
         // Export video functionality
@@ -641,21 +596,14 @@
                 exportHeight = 1440;
             }
             
-            // Create export canvas
-            const exportCanvas = document.createElement('canvas');
-            exportCanvas.width = exportWidth;
-            exportCanvas.height = exportHeight;
-            const exportCtx = exportCanvas.getContext('2d');
-            
-            // Calculate scaling to fit export dimensions
-            const scale = Math.min(exportWidth / mainImage.width, exportHeight / mainImage.height);
-            const scaledWidth = mainImage.width * scale;
-            const scaledHeight = mainImage.height * scale;
-            const offsetX = (exportWidth - scaledWidth) / 2;
-            const offsetY = (exportHeight - scaledHeight) / 2;
-            
-            // Setup MediaRecorder
-            const stream = exportCanvas.captureStream(fps);
+            // Capture stream directly from WebGL canvas
+            const originalWidth = renderer.domElement.width;
+            const originalHeight = renderer.domElement.height;
+            renderer.setSize(exportWidth, exportHeight);
+            camera.aspect = exportWidth / exportHeight;
+            camera.updateProjectionMatrix();
+
+            const stream = renderer.domElement.captureStream(fps);
             const mimeType = format === 'mp4' ? 'video/mp4' : 'video/webm';
             
             let options = { mimeType };
@@ -699,31 +647,19 @@
             function renderExportFrame() {
                 if (currentFrame >= totalFrames) {
                     recorder.stop();
+                    renderer.setSize(originalWidth, originalHeight);
+                    camera.aspect = originalWidth / originalHeight;
+                    camera.updateProjectionMatrix();
                     return;
                 }
-                
+
                 const progress = (currentFrame / totalFrames) * 100;
                 progressFill.style.width = progress + '%';
                 progressText.textContent = `Processing... ${Math.round(progress)}%`;
-                
-                const time = (currentFrame / fps);
-                
-                // Clear export canvas
-                exportCtx.fillStyle = '#000';
-                exportCtx.fillRect(0, 0, exportWidth, exportHeight);
-                
-                // Create temporary canvas for full resolution render
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = mainImage.width;
-                tempCanvas.height = mainImage.height;
-                const tempCtx = tempCanvas.getContext('2d');
-                
-                // Render frame at full resolution
-                renderFrameToCanvas(time, tempCanvas, tempCtx);
-                
-                // Draw scaled frame to export canvas
-                exportCtx.drawImage(tempCanvas, offsetX, offsetY, scaledWidth, scaledHeight);
-                
+
+                const time = currentFrame / fps;
+                renderFrame(time);
+
                 currentFrame++;
                 setTimeout(renderExportFrame, 1000 / fps);
             }
