@@ -7,6 +7,7 @@ This project contains a single-page web application for generating short paralla
 1. Open `simple-depthy.html` in a modern web browser.
 2. Upload a main image and a grayscale depth map.
 3. Adjust the strength, speed and radius sliders to tune the 3D effect.
+
 4. The image is deformed per pixel based on the depth map and gaps are
    filled with a simple inpainting routine.
 5. Use the **Export Video** panel to record the animation.
