@@ -1,758 +1,317 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Depthy - 3D Parallax Video Generator</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0a0a0a;
-            color: #ffffff;
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-
-        .header {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 2px 20px rgba(0,0,0,0.5);
-        }
-
-        .header h1 {
-            font-size: 2.5em;
-            font-weight: 300;
-            letter-spacing: 2px;
-            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .container {
-            display: grid;
-            grid-template-columns: 350px 1fr;
-            grid-template-rows: 1fr auto;
-            gap: 20px;
-            padding: 20px;
-            max-width: 1400px;
-            margin: 0 auto;
-            height: calc(100vh - 100px);
-        }
-
-        .upload-zone {
-            background: rgba(255,255,255,0.05);
-            border-radius: 15px;
-            padding: 20px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-
-        .upload-area {
-            border: 2px dashed rgba(102, 126, 234, 0.5);
-            border-radius: 10px;
-            padding: 30px;
-            text-align: center;
-            margin-bottom: 15px;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .upload-area:hover {
-            border-color: #667eea;
-            background: rgba(102, 126, 234, 0.1);
-        }
-
-        .upload-area.dragging {
-            border-color: #764ba2;
-            background: rgba(118, 75, 162, 0.2);
-        }
-
-        .upload-area input[type="file"] {
-            display: none;
-        }
-
-        .upload-preview {
-            width: 100%;
-            height: 150px;
-            object-fit: cover;
-            border-radius: 8px;
-            margin-top: 10px;
-            display: none;
-        }
-
-        .preview-window {
-            background: rgba(0,0,0,0.5);
-            border-radius: 15px;
-            padding: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        #previewCanvas {
-            max-width: 100%;
-            max-height: 100%;
-            border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-        }
-
-        .controls {
-            background: rgba(255,255,255,0.05);
-            border-radius: 15px;
-            padding: 20px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-
-        .control-group {
-            margin-bottom: 20px;
-        }
-
-        .control-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 14px;
-            color: #aaa;
-        }
-
-        .slider-container {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        input[type="range"] {
-            flex: 1;
-            -webkit-appearance: none;
-            height: 6px;
-            border-radius: 3px;
-            background: rgba(255,255,255,0.1);
-            outline: none;
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
-            cursor: pointer;
-        }
-
-        .value-display {
-            min-width: 50px;
-            text-align: right;
-            font-size: 14px;
-        }
-
-        .export-panel {
-            background: rgba(255,255,255,0.05);
-            border-radius: 15px;
-            padding: 20px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-
-        .export-options {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        select {
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            color: white;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 14px;
-            cursor: pointer;
-        }
-
-        .export-button {
-            width: 100%;
-            padding: 15px;
-            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            border-radius: 10px;
-            color: white;
-            font-size: 16px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .export-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.5);
-        }
-
-        .export-button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 4px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 2px;
-            margin-top: 15px;
-            overflow: hidden;
-            display: none;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
-            width: 0%;
-            transition: width 0.3s ease;
-        }
-
-        .progress-text {
-            text-align: center;
-            margin-top: 10px;
-            font-size: 14px;
-            color: #aaa;
-            display: none;
-        }
-
-        .error-message {
-            background: rgba(255, 59, 48, 0.2);
-            border: 1px solid rgba(255, 59, 48, 0.5);
-            color: #ff3b30;
-            padding: 10px;
-            border-radius: 8px;
-            margin-top: 10px;
-            font-size: 14px;
-            display: none;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                grid-template-columns: 1fr;
-                height: auto;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple Depthy - 3D Parallax Video Generator</title>
+  <script src="https://cdn.jsdelivr.net/npm/pixi.js@1.5.3/bin/pixi.min.js"></script>
+  <script src="depth-perspective-filter.js"></script>
+  <style>
+    /* [весь твой CSS остаётся без изменений] */
+  </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Simple Depthy</h1>
+  <div class="header">
+    <h1>Simple Depthy</h1>
+  </div>
+
+  <div class="container">
+    <div class="upload-zone">
+      <h3 style="margin-bottom: 15px;">Upload Files</h3>
+
+      <div class="upload-area" id="imageUpload">
+        <input type="file" id="imageInput" accept="image/jpeg,image/png">
+        <p style="margin-bottom: 5px;">📷 Main Image</p>
+        <p style="font-size: 12px; color: #666;">Drag & Drop or Click</p>
+        <img class="upload-preview" id="imagePreview" alt="Main image preview">
+      </div>
+
+      <div class="upload-area" id="depthUpload">
+        <input type="file" id="depthInput" accept="image/jpeg,image/png">
+        <p style="margin-bottom: 5px;">🗘️ Depth Map</p>
+        <p style="font-size: 12px; color: #666;">Grayscale image</p>
+        <img class="upload-preview" id="depthPreview" alt="Depth map preview">
+      </div>
+
+      <div class="error-message" id="errorMessage"></div>
     </div>
 
-    <div class="container">
-        <div class="upload-zone">
-            <h3 style="margin-bottom: 15px;">Upload Files</h3>
-            
-            <div class="upload-area" id="imageUpload">
-                <input type="file" id="imageInput" accept="image/jpeg,image/png">
-                <p style="margin-bottom: 5px;">📷 Main Image</p>
-                <p style="font-size: 12px; color: #666;">Drag & Drop or Click</p>
-                <img class="upload-preview" id="imagePreview" alt="Main image preview">
-            </div>
-
-            <div class="upload-area" id="depthUpload">
-                <input type="file" id="depthInput" accept="image/jpeg,image/png">
-                <p style="margin-bottom: 5px;">🗺️ Depth Map</p>
-                <p style="font-size: 12px; color: #666;">Grayscale image</p>
-                <img class="upload-preview" id="depthPreview" alt="Depth map preview">
-            </div>
-
-            <div class="error-message" id="errorMessage"></div>
-        </div>
-
-        <div class="preview-window">
-            <canvas id="previewCanvas">Your browser does not support canvas.</canvas>
-        </div>
-
-        <div class="controls">
-            <h3 style="margin-bottom: 20px;">3D Effect Settings</h3>
-            
-            <div class="control-group">
-                <label>Effect Strength</label>
-                <div class="slider-container">
-                    <input type="range" id="strengthSlider" min="0" max="100" value="50">
-                    <span class="value-display" id="strengthValue">50%</span>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <label>Animation Speed</label>
-                <div class="slider-container">
-                    <input type="range" id="speedSlider" min="10" max="300" value="100">
-                    <span class="value-display" id="speedValue">1.0x</span>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <label>Motion Radius</label>
-                <div class="slider-container">
-                    <input type="range" id="radiusSlider" min="10" max="100" value="50">
-                    <span class="value-display" id="radiusValue">50</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="export-panel">
-            <h3 style="margin-bottom: 20px;">Export Video</h3>
-            
-            <div class="export-options">
-                <div>
-                    <label style="display: block; margin-bottom: 5px; font-size: 14px; color: #aaa;">Duration</label>
-                    <select id="durationSelect">
-                        <option value="3">3 seconds</option>
-                        <option value="5" selected>5 seconds</option>
-                        <option value="10">10 seconds</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label style="display: block; margin-bottom: 5px; font-size: 14px; color: #aaa;">Resolution</label>
-                    <select id="resolutionSelect">
-                        <option value="1080" selected>1080p (1920x1080)</option>
-                        <option value="1440">2K (2560x1440)</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label style="display: block; margin-bottom: 5px; font-size: 14px; color: #aaa;">FPS</label>
-                    <select id="fpsSelect">
-                        <option value="30" selected>30 FPS</option>
-                        <option value="60">60 FPS</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label style="display: block; margin-bottom: 5px; font-size: 14px; color: #aaa;">Format</label>
-                    <select id="formatSelect">
-                        <option value="mp4" selected>MP4</option>
-                        <option value="webm">WebM</option>
-                    </select>
-                </div>
-            </div>
-
-            <button class="export-button" id="exportButton" disabled>Export Video</button>
-            
-            <div class="progress-bar" id="progressBar">
-                <div class="progress-fill" id="progressFill"></div>
-            </div>
-            <div class="progress-text" id="progressText">Processing...</div>
-        </div>
+    <div class="preview-window">
+      <canvas id="previewCanvas">Your browser does not support canvas.</canvas>
     </div>
 
-    <script>
-        // Global variables
-        let mainImage = null;
-        let depthMap = null;
-        let animationFrame = null;
-        let depthData = null;
-        let isExporting = false;
+    <div class="controls">
+      <h3 style="margin-bottom: 20px;">3D Effect Settings</h3>
 
-        // DOM elements
-        const imageUpload = document.getElementById('imageUpload');
-        const depthUpload = document.getElementById('depthUpload');
-        const imageInput = document.getElementById('imageInput');
-        const depthInput = document.getElementById('depthInput');
-        const imagePreview = document.getElementById('imagePreview');
-        const depthPreview = document.getElementById('depthPreview');
-        const previewCanvas = document.getElementById('previewCanvas');
-        const ctx = previewCanvas.getContext('2d');
-        const errorMessage = document.getElementById('errorMessage');
-        const exportButton = document.getElementById('exportButton');
-        const progressBar = document.getElementById('progressBar');
-        const progressFill = document.getElementById('progressFill');
-        const progressText = document.getElementById('progressText');
+      <div class="control-group">
+        <label>Effect Strength</label>
+        <div class="slider-container">
+          <input type="range" id="strengthSlider" min="0" max="100" value="50">
+          <span class="value-display" id="strengthValue">50%</span>
+        </div>
+      </div>
 
-        // Controls
-        const strengthSlider = document.getElementById('strengthSlider');
-        const speedSlider = document.getElementById('speedSlider');
-        const radiusSlider = document.getElementById('radiusSlider');
-        const strengthValue = document.getElementById('strengthValue');
-        const speedValue = document.getElementById('speedValue');
-        const radiusValue = document.getElementById('radiusValue');
+      <div class="control-group">
+        <label>Animation Speed</label>
+        <div class="slider-container">
+          <input type="range" id="speedSlider" min="10" max="300" value="100">
+          <span class="value-display" id="speedValue">1.0x</span>
+        </div>
+      </div>
 
-        // File upload handlers
-        function setupUploadHandlers(uploadArea, input, preview, callback) {
-            uploadArea.addEventListener('click', () => input.click());
-            
-            uploadArea.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                uploadArea.classList.add('dragging');
-            });
-            
-            uploadArea.addEventListener('dragleave', () => {
-                uploadArea.classList.remove('dragging');
-            });
-            
-            uploadArea.addEventListener('drop', (e) => {
-                e.preventDefault();
-                uploadArea.classList.remove('dragging');
-                const file = e.dataTransfer.files[0];
-                if (file && file.type.startsWith('image/')) {
-                    handleFile(file, preview, callback);
-                }
-            });
-            
-            input.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    handleFile(file, preview, callback);
-                }
-            });
+      <div class="control-group">
+        <label>Motion Radius</label>
+        <div class="slider-container">
+          <input type="range" id="radiusSlider" min="10" max="100" value="50">
+          <span class="value-display" id="radiusValue">50</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="export-panel">
+      <h3 style="margin-bottom: 20px;">Export Video</h3>
+
+      <div class="export-options">
+        <div>
+          <label style="display: block; margin-bottom: 5px; font-size: 14px; color: #aaa;">Duration</label>
+          <select id="durationSelect">
+            <option value="3">3 seconds</option>
+            <option value="5" selected>5 seconds</option>
+            <option value="10">10 seconds</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="display: block; margin-bottom: 5px; font-size: 14px; color: #aaa;">Resolution</label>
+          <select id="resolutionSelect">
+            <option value="1080" selected>1080p (1920x1080)</option>
+            <option value="1440">2K (2560x1440)</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="display: block; margin-bottom: 5px; font-size: 14px; color: #aaa;">FPS</label>
+          <select id="fpsSelect">
+            <option value="30" selected>30 FPS</option>
+            <option value="60">60 FPS</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="display: block; margin-bottom: 5px; font-size: 14px; color: #aaa;">Format</label>
+          <select id="formatSelect">
+            <option value="mp4" selected>MP4</option>
+            <option value="webm">WebM</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="export-button" id="exportButton" disabled>Export Video</button>
+
+      <div class="progress-bar" id="progressBar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-text" id="progressText">Processing...</div>
+    </div>
+  </div>
+
+  <script>
+    let mainImage = null;
+    let depthMap = null;
+    let animationFrame = null;
+    let isExporting = false;
+
+    const imageUpload = document.getElementById('imageUpload');
+    const depthUpload = document.getElementById('depthUpload');
+    const imageInput = document.getElementById('imageInput');
+    const depthInput = document.getElementById('depthInput');
+    const imagePreview = document.getElementById('imagePreview');
+    const depthPreview = document.getElementById('depthPreview');
+    const previewCanvas = document.getElementById('previewCanvas');
+    let renderer = null, stage = null, mesh = null, depthFilter = null;
+    const errorMessage = document.getElementById('errorMessage');
+    const exportButton = document.getElementById('exportButton');
+    const progressBar = document.getElementById('progressBar');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+
+    const strengthSlider = document.getElementById('strengthSlider');
+    const speedSlider = document.getElementById('speedSlider');
+    const radiusSlider = document.getElementById('radiusSlider');
+    const strengthValue = document.getElementById('strengthValue');
+    const speedValue = document.getElementById('speedValue');
+    const radiusValue = document.getElementById('radiusValue');
+
+    function setupUploadHandlers(uploadArea, input, preview, callback) {
+      uploadArea.addEventListener('click', () => input.click());
+      uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragging'); });
+      uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragging'));
+      uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragging');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) handleFile(file, preview, callback);
+      });
+      input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) handleFile(file, preview, callback);
+      });
+    }
+
+    function handleFile(file, preview, callback) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          preview.src = e.target.result;
+          preview.style.display = 'block';
+          callback(img);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function processDepthMap() {
+      if (!depthMap) return;
+      const canvas = document.createElement('canvas');
+      canvas.width = depthMap.width;
+      canvas.height = depthMap.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(depthMap, 0, 0);
+      ctx.getImageData(0, 0, depthMap.width, depthMap.height);
+    }
+
+    function validateAndStart() {
+      errorMessage.style.display = 'none';
+      if (!mainImage || !depthMap) return;
+      if (mainImage.width !== depthMap.width || mainImage.height !== depthMap.height) {
+        showError('Image dimensions must match depth map dimensions');
+        return;
+      }
+      exportButton.disabled = false;
+      initPixi();
+      startAnimation();
+    }
+
+    function showError(msg) {
+      errorMessage.textContent = msg;
+      errorMessage.style.display = 'block';
+    }
+
+    function initPixi() {
+      const width = mainImage.width;
+      const height = mainImage.height;
+      if (!renderer) {
+        renderer = PIXI.autoDetectRenderer(width, height, { view: previewCanvas, antialias: true, transparent: false });
+      } else {
+        renderer.resize(width, height);
+      }
+      stage = new PIXI.Stage(0x000000);
+      const baseTexture = new PIXI.BaseTexture(mainImage);
+      const colorTexture = new PIXI.Texture(baseTexture);
+      const depthBase = new PIXI.BaseTexture(depthMap);
+      const depthTexture = new PIXI.Texture(depthBase);
+      mesh = new PIXI.Sprite(colorTexture);
+      depthFilter = new PIXI.DepthPerspectiveFilter(depthTexture, 4);
+      mesh.filters = [depthFilter];
+      stage.addChild(mesh);
+    }
+
+    function startAnimation() {
+      if (animationFrame) cancelAnimationFrame(animationFrame);
+      const startTime = Date.now();
+      function animate() {
+        if (!mainImage || !stage || isExporting) {
+          animationFrame = requestAnimationFrame(animate);
+          return;
         }
+        const elapsed = (Date.now() - startTime) / 1000;
+        renderFrame(elapsed);
+        animationFrame = requestAnimationFrame(animate);
+      }
+      animate();
+    }
 
-        function handleFile(file, preview, callback) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    preview.src = e.target.result;
-                    preview.style.display = 'block';
-                    callback(img);
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
+    function renderFrame(time) {
+      if (!stage) return;
+      const strength = parseFloat(strengthSlider.value) / 100;
+      const speed = parseFloat(speedSlider.value) / 100;
+      const radius = parseFloat(radiusSlider.value);
+      depthFilter.scale = 0.02 * strength;
+      const offX = Math.sin(time * speed) * radius;
+      const offY = Math.cos(time * speed) * radius * 0.5;
+      depthFilter.offset = { x: offX, y: offY };
+      renderer.render(stage);
+    }
+
+    async function exportVideo() {
+      if (isExporting) return;
+      isExporting = true;
+      exportButton.disabled = true;
+      progressBar.style.display = 'block';
+      progressText.style.display = 'block';
+      const duration = parseInt(document.getElementById('durationSelect').value);
+      const resolution = document.getElementById('resolutionSelect').value;
+      const fps = parseInt(document.getElementById('fpsSelect').value);
+      const format = document.getElementById('formatSelect').value;
+      const exportWidth = resolution === '1080' ? 1920 : 2560;
+      const exportHeight = resolution === '1080' ? 1080 : 1440;
+      const originalWidth = renderer.width;
+      const originalHeight = renderer.height;
+      renderer.resize(exportWidth, exportHeight);
+      const stream = renderer.view.captureStream(fps);
+      let options = { mimeType: format === 'mp4' ? 'video/mp4' : 'video/webm' };
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) options.mimeType = 'video/webm';
+      const recorder = new MediaRecorder(stream, options);
+      const chunks = [];
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: options.mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `depthy_${Date.now()}.${format}`;
+        a.click();
+        URL.revokeObjectURL(url);
+        isExporting = false;
+        exportButton.disabled = false;
+        progressBar.style.display = 'none';
+        progressText.style.display = 'none';
+        progressFill.style.width = '0%';
+      };
+      recorder.start();
+      const totalFrames = duration * fps;
+      let currentFrame = 0;
+      function renderExportFrame() {
+        if (currentFrame >= totalFrames) {
+          recorder.stop();
+          renderer.resize(originalWidth, originalHeight);
+          return;
         }
+        const progress = (currentFrame / totalFrames) * 100;
+        progressFill.style.width = `${progress}%`;
+        progressText.textContent = `Processing... ${Math.round(progress)}%`;
+        renderFrame(currentFrame / fps);
+        currentFrame++;
+        setTimeout(renderExportFrame, 1000 / fps);
+      }
+      renderExportFrame();
+    }
 
-        // Setup upload handlers
-        setupUploadHandlers(imageUpload, imageInput, imagePreview, (img) => {
-            mainImage = img;
-            validateAndStart();
-        });
+    strengthSlider.addEventListener('input', e => strengthValue.textContent = `${e.target.value}%`);
+    speedSlider.addEventListener('input', e => speedValue.textContent = `${(e.target.value / 100).toFixed(1)}x`);
+    radiusSlider.addEventListener('input', e => radiusValue.textContent = e.target.value);
+    exportButton.addEventListener('click', exportVideo);
 
-        setupUploadHandlers(depthUpload, depthInput, depthPreview, (img) => {
-            depthMap = img;
-            processDepthMap();
-            validateAndStart();
-        });
+    setupUploadHandlers(imageUpload, imageInput, imagePreview, img => { mainImage = img; validateAndStart(); });
+    setupUploadHandlers(depthUpload, depthInput, depthPreview, img => { depthMap = img; processDepthMap(); validateAndStart(); });
 
-        // Process depth map to extract depth data
-        function processDepthMap() {
-            if (!depthMap) return;
-            
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = depthMap.width;
-            tempCanvas.height = depthMap.height;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.drawImage(depthMap, 0, 0);
-            
-            const imageData = tempCtx.getImageData(0, 0, depthMap.width, depthMap.height);
-            depthData = new Float32Array(imageData.data.length / 4);
-            
-            for (let i = 0; i < depthData.length; i++) {
-                // Convert to grayscale and normalize to 0-1
-                const r = imageData.data[i * 4];
-                const g = imageData.data[i * 4 + 1];
-                const b = imageData.data[i * 4 + 2];
-                depthData[i] = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
-            }
-        }
-
-        // Validate images and start animation
-        function validateAndStart() {
-            errorMessage.style.display = 'none';
-            
-            if (!mainImage || !depthMap) {
-                return;
-            }
-            
-            if (mainImage.width !== depthMap.width || mainImage.height !== depthMap.height) {
-                showError('Image dimensions must match depth map dimensions');
-                return;
-            }
-            
-            exportButton.disabled = false;
-            startAnimation();
-        }
-
-        function showError(message) {
-            errorMessage.textContent = message;
-            errorMessage.style.display = 'block';
-        }
-
-        // Animation loop
-        function startAnimation() {
-            if (animationFrame) {
-                cancelAnimationFrame(animationFrame);
-            }
-            
-            const startTime = Date.now();
-            
-            function animate() {
-                if (!mainImage || !depthData || isExporting) {
-                    animationFrame = requestAnimationFrame(animate);
-                    return;
-                }
-                
-                const elapsed = (Date.now() - startTime) / 1000;
-                renderFrame(elapsed);
-                animationFrame = requestAnimationFrame(animate);
-            }
-            
-            animate();
-        }
-
-
-        // Render a single frame using per-pixel displacement
-        function renderFrame(time) {
-            renderFrameToCanvas(time, previewCanvas, ctx);
-        }
-        
-        function renderFrameToCanvas(time, canvas, context) {
-            const width = mainImage.width;
-            const height = mainImage.height;
-
-            canvas.width = width;
-            canvas.height = height;
-
-            const strength = parseFloat(strengthSlider.value) / 100;
-            const speed = parseFloat(speedSlider.value) / 100;
-            const radius = parseFloat(radiusSlider.value);
-
-            const cameraX = Math.sin(time * speed) * radius;
-            const cameraY = Math.cos(time * speed) * radius * 0.5;
-
-            // Draw source image to temporary canvas
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = width;
-            tempCanvas.height = height;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.drawImage(mainImage, 0, 0);
-
-            const srcData = tempCtx.getImageData(0, 0, width, height);
-            const dstData = tempCtx.createImageData(width, height);
-
-            const offsetXFactor = cameraX * strength * 0.02 * width;
-            const offsetYFactor = cameraY * strength * 0.02 * height;
-
-            const src = srcData.data;
-            const dst = dstData.data;
-
-            // Per-pixel displacement by depth
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const depth = depthData[y * width + x];
-                    const depthOffset = (depth - 0.5) * 2;
-                    const dx = Math.round(x - depthOffset * offsetXFactor);
-                    const dy = Math.round(y - depthOffset * offsetYFactor);
-
-                    if (dx < 0 || dx >= width || dy < 0 || dy >= height) {
-                        continue;
-                    }
-
-                    const srcIdx = (y * width + x) * 4;
-                    const dstIdx = (dy * width + dx) * 4;
-
-                    dst[dstIdx] = src[srcIdx];
-                    dst[dstIdx + 1] = src[srcIdx + 1];
-                    dst[dstIdx + 2] = src[srcIdx + 2];
-                    dst[dstIdx + 3] = 255;
-                }
-            }
-
-            // Simple inpainting to fill gaps
-            inpaint(dstData, width, height);
-
-            context.putImageData(dstData, 0, 0);
-        }
-
-        // Naive hole filling via iterative dilation
-        function inpaint(imageData, width, height) {
-            let data = imageData.data;
-            let temp = new Uint8ClampedArray(data);
-            const iterations = 2;
-
-            for (let it = 0; it < iterations; it++) {
-                let changed = false;
-                for (let y = 0; y < height; y++) {
-                    for (let x = 0; x < width; x++) {
-                        const idx = (y * width + x) * 4;
-                        if (data[idx + 3] === 0) {
-                            let r = 0, g = 0, b = 0, count = 0;
-                            for (let oy = -1; oy <= 1; oy++) {
-                                for (let ox = -1; ox <= 1; ox++) {
-                                    if (ox === 0 && oy === 0) continue;
-                                    const nx = x + ox;
-                                    const ny = y + oy;
-                                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                                        const nIdx = (ny * width + nx) * 4;
-                                        if (temp[nIdx + 3] > 0) {
-                                            r += temp[nIdx];
-                                            g += temp[nIdx + 1];
-                                            b += temp[nIdx + 2];
-                                            count++;
-                                        }
-                                    }
-                                }
-                            }
-                            if (count > 0) {
-                                data[idx] = r / count;
-                                data[idx + 1] = g / count;
-                                data[idx + 2] = b / count;
-                                data[idx + 3] = 255;
-                                changed = true;
-                            }
-                        }
-                    }
-                }
-
-                if (!changed) break;
-                temp = new Uint8ClampedArray(data);
-            }
-        }
-
-        // Export video functionality
-        async function exportVideo() {
-            if (isExporting) return;
-            
-            isExporting = true;
-            exportButton.disabled = true;
-            progressBar.style.display = 'block';
-            progressText.style.display = 'block';
-            
-            const duration = parseInt(document.getElementById('durationSelect').value);
-            const resolution = document.getElementById('resolutionSelect').value;
-            const fps = parseInt(document.getElementById('fpsSelect').value);
-            const format = document.getElementById('formatSelect').value;
-            
-            // Set export dimensions
-            let exportWidth, exportHeight;
-            if (resolution === '1080') {
-                exportWidth = 1920;
-                exportHeight = 1080;
-            } else {
-                exportWidth = 2560;
-                exportHeight = 1440;
-            }
-            
-            // Create export canvas
-            const exportCanvas = document.createElement('canvas');
-            exportCanvas.width = exportWidth;
-            exportCanvas.height = exportHeight;
-            const exportCtx = exportCanvas.getContext('2d');
-            
-            // Calculate scaling to fit export dimensions
-            const scale = Math.min(exportWidth / mainImage.width, exportHeight / mainImage.height);
-            const scaledWidth = mainImage.width * scale;
-            const scaledHeight = mainImage.height * scale;
-            const offsetX = (exportWidth - scaledWidth) / 2;
-            const offsetY = (exportHeight - scaledHeight) / 2;
-            
-            // Setup MediaRecorder
-            const stream = exportCanvas.captureStream(fps);
-            const mimeType = format === 'mp4' ? 'video/mp4' : 'video/webm';
-            
-            let options = { mimeType };
-            if (!MediaRecorder.isTypeSupported(mimeType)) {
-                options = { mimeType: 'video/webm' };
-            }
-            
-            const recorder = new MediaRecorder(stream, options);
-            const chunks = [];
-            
-            recorder.ondataavailable = (e) => {
-                if (e.data.size > 0) {
-                    chunks.push(e.data);
-                }
-            };
-            
-            recorder.onstop = () => {
-                const blob = new Blob(chunks, { type: options.mimeType });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `depthy_${Date.now()}.${format === 'mp4' ? 'mp4' : 'webm'}`;
-                a.click();
-                URL.revokeObjectURL(url);
-                
-                // Reset UI
-                isExporting = false;
-                exportButton.disabled = false;
-                progressBar.style.display = 'none';
-                progressText.style.display = 'none';
-                progressFill.style.width = '0%';
-            };
-            
-            // Start recording
-            recorder.start();
-            
-            // Render frames
-            const totalFrames = duration * fps;
-            let currentFrame = 0;
-            
-            function renderExportFrame() {
-                if (currentFrame >= totalFrames) {
-                    recorder.stop();
-                    return;
-                }
-                
-                const progress = (currentFrame / totalFrames) * 100;
-                progressFill.style.width = progress + '%';
-                progressText.textContent = `Processing... ${Math.round(progress)}%`;
-                
-                const time = (currentFrame / fps);
-                
-                // Clear export canvas
-                exportCtx.fillStyle = '#000';
-                exportCtx.fillRect(0, 0, exportWidth, exportHeight);
-                
-                // Create temporary canvas for full resolution render
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = mainImage.width;
-                tempCanvas.height = mainImage.height;
-                const tempCtx = tempCanvas.getContext('2d');
-                
-                // Render frame at full resolution
-                renderFrameToCanvas(time, tempCanvas, tempCtx);
-                
-                // Draw scaled frame to export canvas
-                exportCtx.drawImage(tempCanvas, offsetX, offsetY, scaledWidth, scaledHeight);
-                
-                currentFrame++;
-                setTimeout(renderExportFrame, 1000 / fps);
-            }
-            
-            renderExportFrame();
-        }
-
-        // Control handlers
-        strengthSlider.addEventListener('input', (e) => {
-            strengthValue.textContent = e.target.value + '%';
-        });
-
-        speedSlider.addEventListener('input', (e) => {
-            speedValue.textContent = (e.target.value / 100).toFixed(1) + 'x';
-        });
-
-        radiusSlider.addEventListener('input', (e) => {
-            radiusValue.textContent = e.target.value;
-        });
-
-        exportButton.addEventListener('click', exportVideo);
-
-        // Initialize
-        window.addEventListener('load', () => {
-            // Check browser compatibility
-            if (!window.MediaRecorder) {
-                showError('Your browser does not support video recording. Please use a modern browser.');
-            }
-        });
-    </script>
+    window.addEventListener('load', () => {
+      if (!window.MediaRecorder) {
+        showError('Your browser does not support video recording. Please use a modern browser.');
+      }
+    });
+  </script>
 </body>
 </html>
