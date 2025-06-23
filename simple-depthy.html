@@ -263,21 +263,21 @@
                 <input type="file" id="imageInput" accept="image/jpeg,image/png">
                 <p style="margin-bottom: 5px;">📷 Main Image</p>
                 <p style="font-size: 12px; color: #666;">Drag & Drop or Click</p>
-                <img class="upload-preview" id="imagePreview">
+                <img class="upload-preview" id="imagePreview" alt="Main image preview">
             </div>
 
             <div class="upload-area" id="depthUpload">
                 <input type="file" id="depthInput" accept="image/jpeg,image/png">
                 <p style="margin-bottom: 5px;">🗺️ Depth Map</p>
                 <p style="font-size: 12px; color: #666;">Grayscale image</p>
-                <img class="upload-preview" id="depthPreview">
+                <img class="upload-preview" id="depthPreview" alt="Depth map preview">
             </div>
 
             <div class="error-message" id="errorMessage"></div>
         </div>
 
         <div class="preview-window">
-            <canvas id="previewCanvas"></canvas>
+            <canvas id="previewCanvas">Your browser does not support canvas.</canvas>
         </div>
 
         <div class="controls">
@@ -477,10 +477,6 @@
                 return;
             }
             
-            // Clear cached layers when new images are loaded
-            cachedLayers = null;
-            lastImageUpdate = null;
-            
             exportButton.disabled = false;
             startAnimation();
         }
@@ -512,121 +508,8 @@
             animate();
         }
 
-        // Cache for optimized layers
-        let cachedLayers = null;
-        let lastImageUpdate = null;
-        
-        // Create optimized layers with edge extension
-        function createOptimizedLayers() {
-            if (cachedLayers && lastImageUpdate === mainImage) {
-                return cachedLayers;
-            }
-            
-            const width = mainImage.width;
-            const height = mainImage.height;
-            const layers = 5; // Reduced for better performance
-            const layerData = [];
-            const padding = 30; // Pixels to extend edges
-            
-            // Create enlarged base canvas
-            const enlargedCanvas = document.createElement('canvas');
-            enlargedCanvas.width = width + padding * 2;
-            enlargedCanvas.height = height + padding * 2;
-            const enlargedCtx = enlargedCanvas.getContext('2d');
-            
-            // Draw image with edge extension
-            enlargedCtx.drawImage(mainImage, padding, padding);
-            
-            // Extend edges by stretching border pixels
-            // Top edge
-            enlargedCtx.drawImage(mainImage, 0, 0, width, 1, padding, 0, width, padding);
-            // Bottom edge
-            enlargedCtx.drawImage(mainImage, 0, height-1, width, 1, padding, enlargedCanvas.height-padding, width, padding);
-            // Left edge
-            enlargedCtx.drawImage(mainImage, 0, 0, 1, height, 0, padding, padding, height);
-            // Right edge
-            enlargedCtx.drawImage(mainImage, width-1, 0, 1, height, enlargedCanvas.width-padding, padding, padding, height);
-            
-            // Fill corners
-            const tl = enlargedCtx.getImageData(padding, padding, 1, 1);
-            const tr = enlargedCtx.getImageData(padding + width - 1, padding, 1, 1);
-            const bl = enlargedCtx.getImageData(padding, padding + height - 1, 1, 1);
-            const br = enlargedCtx.getImageData(padding + width - 1, padding + height - 1, 1, 1);
-            
-            enlargedCtx.fillStyle = `rgb(${tl.data[0]},${tl.data[1]},${tl.data[2]})`;
-            enlargedCtx.fillRect(0, 0, padding, padding);
-            enlargedCtx.fillStyle = `rgb(${tr.data[0]},${tr.data[1]},${tr.data[2]})`;
-            enlargedCtx.fillRect(enlargedCanvas.width - padding, 0, padding, padding);
-            enlargedCtx.fillStyle = `rgb(${bl.data[0]},${bl.data[1]},${bl.data[2]})`;
-            enlargedCtx.fillRect(0, enlargedCanvas.height - padding, padding, padding);
-            enlargedCtx.fillStyle = `rgb(${br.data[0]},${br.data[1]},${br.data[2]})`;
-            enlargedCtx.fillRect(enlargedCanvas.width - padding, enlargedCanvas.height - padding, padding, padding);
-            
-            // Create layers with soft transitions
-            for (let layer = 0; layer < layers; layer++) {
-                const layerCanvas = document.createElement('canvas');
-                layerCanvas.width = enlargedCanvas.width;
-                layerCanvas.height = enlargedCanvas.height;
-                const layerCtx = layerCanvas.getContext('2d');
-                
-                // Draw the enlarged image
-                layerCtx.drawImage(enlargedCanvas, 0, 0);
-                
-                // Get image data for masking
-                const imageData = layerCtx.getImageData(0, 0, layerCanvas.width, layerCanvas.height);
-                const data = imageData.data;
-                
-                // Define depth range for this layer with overlap
-                const overlap = 0.15; // 15% overlap between layers
-                const layerRange = 1.0 / layers;
-                const minDepth = Math.max(0, layer * layerRange - overlap);
-                const maxDepth = Math.min(1, (layer + 1) * layerRange + overlap);
-                const centerDepth = (minDepth + maxDepth) / 2;
-                
-                // Apply soft mask based on depth
-                for (let y = 0; y < height; y++) {
-                    for (let x = 0; x < width; x++) {
-                        const depthIndex = y * width + x;
-                        const depth = depthData[depthIndex];
-                        
-                        // Calculate position in enlarged canvas
-                        const dataX = x + padding;
-                        const dataY = y + padding;
-                        const dataIndex = (dataY * layerCanvas.width + dataX) * 4;
-                        
-                        // Calculate alpha based on distance from layer center
-                        let alpha = 1.0;
-                        if (depth < minDepth || depth > maxDepth) {
-                            alpha = 0;
-                        } else {
-                            // Smooth falloff at edges
-                            const distFromCenter = Math.abs(depth - centerDepth);
-                            const maxDist = (maxDepth - minDepth) / 2;
-                            if (distFromCenter > maxDist * 0.7) {
-                                alpha = 1 - ((distFromCenter - maxDist * 0.7) / (maxDist * 0.3));
-                                alpha = Math.max(0, Math.min(1, alpha));
-                            }
-                        }
-                        
-                        data[dataIndex + 3] = data[dataIndex + 3] * alpha;
-                    }
-                }
-                
-                layerCtx.putImageData(imageData, 0, 0);
-                
-                layerData.push({
-                    canvas: layerCanvas,
-                    depth: centerDepth,
-                    padding: padding
-                });
-            }
-            
-            cachedLayers = layerData;
-            lastImageUpdate = mainImage;
-            return layerData;
-        }
-        
-        // Render a single frame with optimized layers
+
+        // Render a single frame using per-pixel displacement
         function renderFrame(time) {
             renderFrameToCanvas(time, previewCanvas, ctx);
         }
@@ -634,55 +517,104 @@
         function renderFrameToCanvas(time, canvas, context) {
             const width = mainImage.width;
             const height = mainImage.height;
-            
+
             canvas.width = width;
             canvas.height = height;
-            
-            // Get effect parameters
+
             const strength = parseFloat(strengthSlider.value) / 100;
             const speed = parseFloat(speedSlider.value) / 100;
             const radius = parseFloat(radiusSlider.value);
-            
-            // Calculate camera position
+
             const cameraX = Math.sin(time * speed) * radius;
             const cameraY = Math.cos(time * speed) * radius * 0.5;
-            
-            // Clear canvas
-            context.fillStyle = '#000';
-            context.fillRect(0, 0, width, height);
-            
-            // Get or create optimized layers
-            const layers = createOptimizedLayers();
-            
-            // Sort layers by depth (back to front)
-            const sortedLayers = [...layers].sort((a, b) => b.depth - a.depth);
-            
-            // Draw layers with parallax effect
-            context.save();
-            context.globalCompositeOperation = 'source-over';
-            
-            for (const layer of sortedLayers) {
-                const depthOffset = (layer.depth - 0.5) * 2; // -1 to 1
-                
-                // Calculate parallax offset
-                const offsetX = cameraX * depthOffset * strength * 0.01 * width;
-                const offsetY = cameraY * depthOffset * strength * 0.01 * height;
-                
-                // Draw layer with offset, accounting for padding
-                context.drawImage(
-                    layer.canvas,
-                    layer.padding - offsetX,
-                    layer.padding - offsetY,
-                    width,
-                    height,
-                    0,
-                    0,
-                    width,
-                    height
-                );
+
+            // Draw source image to temporary canvas
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = width;
+            tempCanvas.height = height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(mainImage, 0, 0);
+
+            const srcData = tempCtx.getImageData(0, 0, width, height);
+            const dstData = tempCtx.createImageData(width, height);
+
+            const offsetXFactor = cameraX * strength * 0.02 * width;
+            const offsetYFactor = cameraY * strength * 0.02 * height;
+
+            const src = srcData.data;
+            const dst = dstData.data;
+
+            // Per-pixel displacement by depth
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const depth = depthData[y * width + x];
+                    const depthOffset = (depth - 0.5) * 2;
+                    const dx = Math.round(x - depthOffset * offsetXFactor);
+                    const dy = Math.round(y - depthOffset * offsetYFactor);
+
+                    if (dx < 0 || dx >= width || dy < 0 || dy >= height) {
+                        continue;
+                    }
+
+                    const srcIdx = (y * width + x) * 4;
+                    const dstIdx = (dy * width + dx) * 4;
+
+                    dst[dstIdx] = src[srcIdx];
+                    dst[dstIdx + 1] = src[srcIdx + 1];
+                    dst[dstIdx + 2] = src[srcIdx + 2];
+                    dst[dstIdx + 3] = 255;
+                }
             }
-            
-            context.restore();
+
+            // Simple inpainting to fill gaps
+            inpaint(dstData, width, height);
+
+            context.putImageData(dstData, 0, 0);
+        }
+
+        // Naive hole filling via iterative dilation
+        function inpaint(imageData, width, height) {
+            let data = imageData.data;
+            let temp = new Uint8ClampedArray(data);
+            const iterations = 2;
+
+            for (let it = 0; it < iterations; it++) {
+                let changed = false;
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const idx = (y * width + x) * 4;
+                        if (data[idx + 3] === 0) {
+                            let r = 0, g = 0, b = 0, count = 0;
+                            for (let oy = -1; oy <= 1; oy++) {
+                                for (let ox = -1; ox <= 1; ox++) {
+                                    if (ox === 0 && oy === 0) continue;
+                                    const nx = x + ox;
+                                    const ny = y + oy;
+                                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                                        const nIdx = (ny * width + nx) * 4;
+                                        if (temp[nIdx + 3] > 0) {
+                                            r += temp[nIdx];
+                                            g += temp[nIdx + 1];
+                                            b += temp[nIdx + 2];
+                                            count++;
+                                        }
+                                    }
+                                }
+                            }
+                            if (count > 0) {
+                                data[idx] = r / count;
+                                data[idx + 1] = g / count;
+                                data[idx + 2] = b / count;
+                                data[idx + 3] = 255;
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+
+                if (!changed) break;
+                temp = new Uint8ClampedArray(data);
+            }
         }
 
         // Export video functionality
